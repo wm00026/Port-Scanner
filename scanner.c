@@ -12,6 +12,12 @@
 #define MAX_PORT 65535
 
 
+/*
+ * parses the port and converts it to an integer
+ * str: the port as a string, referenced with a ptr
+ * out_port, the output of the port as a string, reference with a ptr
+ * return: 1, and the out_port.
+ */
 int parse_port(const char* str, int *out_port) {
     char* endptr;
     errno = 0;
@@ -26,6 +32,12 @@ int parse_port(const char* str, int *out_port) {
     return 1;
 }
 
+/**
+ * builds the target that will be scanned:
+ * ip: the IP that is being scanned, referenced with a ptr
+ * port: the parsed port
+ * target: the target that we are scanning, from the struct "sockaddr_in"
+ */
 int build_target(const char* ip, int port, struct sockaddr_in* target) {
     memset(target, 0, sizeof(*target));
 
@@ -35,6 +47,11 @@ int build_target(const char* ip, int port, struct sockaddr_in* target) {
     return inet_pton(AF_INET, ip, &target->sin_addr) == 1;
 }
 
+/**
+ * Scans the target IP:port
+ * ip: The IP being scanned
+ * port: the port being scanned
+ */ 
 void scan_target(const char* ip, int port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
@@ -64,6 +81,7 @@ void scan_target(const char* ip, int port) {
     close(sock);
 }
 
+// Main function
 int main(int argc, char* argv[]) {
     if (argc != 4) {
         fprintf(stderr, "Usage: %s <ip> <start_port> <end_port> \n", argv[0]);
@@ -85,7 +103,8 @@ int main(int argc, char* argv[]) {
 
     printf("Scanning %s, port %d-%d\n", ip_address, start_port, end_port);
 
-    for (int port = start_port; port < end_port; port++) {
+    // Loops each port for each port given in the range
+    for (int port = start_port; port <= end_port; port++) {
         scan_target(ip_address, port);
     }
 
