@@ -35,52 +35,59 @@ int build_target(const char* ip, int port, struct sockaddr_in* target) {
     return inet_pton(AF_INET, ip, &target->sin_addr) == 1;
 }
 
-void check_port(int sock, struct sockaddr_in* target, int port) {
-    if (connect(sock, (struct sockaddr *)target, sizeof(*target)) == 0) {
-        printf("Port %d is OPEN\n", port);
+void scan_target(const char* ip, int port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        perror("socket");
         return;
     }
 
-    switch (errno) {
-        case ECONNREFUSED: printf("Port CLOSED\n"); break;
-        case ETIMEDOUT: printf("Filtered (timeout)\n"); break;
-        case EHOSTUNREACH: printf("Host unreachable\n"); break;
-        case ENETUNREACH: printf("Network unreachable\n"); break;
-        default: perror("connect");
+    struct sockaddr_in target;
+    if (!build_target(ip, port, &target)) {
+        fprintf(stderr, "Invalid IPv4 address.\n");
+        close(sock);
+        return;
     }
+
+    if (connect(sock, (struct sockaddr* )&target, sizeof(target)) == 0) {
+        printf("Port %d is OPEN\n", port);
+    }
+    else {
+        switch (errno) {
+            case ECONNREFUSED: printf("Port %d is CLOSED\n", port); break;
+            case ETIMEDOUT: printf("Port %d filtered (timeout)\n", port); break;
+            case EHOSTUNREACH: printf("Port %d: host unreachable\n", port); break;
+            case ENETUNREACH: printf("Port %d: network unreachable\n", port); break;
+        }
+    }
+
+    close(sock);
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <ip> <port>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <ip> <start_port> <end_port> \n", argv[0]);
         return 1;
     }
 
     const char* ip_address = argv[1];
 
-    int target_port;
-    if (!parse_port(argv[2], &target_port)) {
-        fprintf(stderr, "Invalid port: %s\n", argv[2]);
+    int start_port, end_port;
+    if (!parse_port(argv[2], &start_port) || !parse_port(argv[3], &end_port)) {
+        fprintf(stderr, "Invalid port range: %s-%s\n", argv[2], argv[3]);
         return 1;
     }
 
-    printf("ip is %s, port is %d\n", ip_address, target_port);
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        perror("socket");
+    if (start_port > end_port) {
+        fprintf(stderr, "Start port must be <= end port\n");
         return 1;
     }
 
-    struct sockaddr_in target;
-    if (!build_target(ip_address, target_port, &target)) {
-        fprintf(stderr, "Invalid IPv4 address\n");
-        close(sock);
-        return 1;
+    printf("Scanning %s, port %d-%d\n", ip_address, start_port, end_port);
+
+    for (int port = start_port; port < end_port; port++) {
+        scan_target(ip_address, port);
     }
 
-    check_port(sock, &target, target_port);
-
-    close(sock);
     return 0;
 }
